@@ -1,0 +1,579 @@
+<?php
+
+/**
+ * Island Pay Payment Gateway
+ *
+ * Provides an Island Pay Payment Gateway.
+ *
+ * @author        Island Pay
+ */
+class WC_Gateway_IslandPay extends WC_Payment_Gateway
+{
+    public $version = '1.0.0';
+
+    public function __construct()
+    {
+        $this->id                 = 'islandpay';  // Unique ID for your gateway
+        $this->logger_id           = 'wc-gw-islandpay';
+        $this->method_title       = __('Island Pay', 'wc-gw-islandpay'); // Title of the payment method shown on the admin page.
+        $this->method_description = __('Island Pay Payments', 'wc-gw-islandpay'); // Description for the payment method shown on the admin page.
+        $this->icon               = $this->plugin_url() . '/assets/images/islandpay-icon.png'; // Show an image next to the gateway’s name on the frontend
+        $this->has_fields         = true;  // true if you want payment fields to show on the checkout (if doing a direct integration).
+
+        // Setup available countries.
+        $this->available_countries = array('BS');
+
+        // Setup available currency codes.
+        $this->available_currencies = array('BSD');
+
+        // Load the form fields.
+        $this->init_form_fields();
+
+        // Load the settings.
+        $this->init_settings();
+
+        $this->title = $this->settings['title'];  // Displayed on the 'choose payment method' screen
+
+        // Setup default merchant data.
+        $this->url                  = 'https://www.islandpay.com';
+        $this->api_endpoint         = 'https://snapper.islandpay.com/ecomm';
+        $this->api_endpoint_sandbox = 'https://conch.islandpay.com/ecomm';
+        $this->response_url         = add_query_arg('wc-api', 'WC_Gateway_IslandPay', home_url('/'));
+
+        // Debug mode.
+        $this->debug = false;
+        if (isset($this->settings['debug']) && 'yes' == $this->settings['debug']) {
+            $this->debug = true;
+        }
+
+        if (class_exists('WC_Logger')) {
+            $this->logger = new WC_Logger();
+        } else {
+            $this->logger = WC()->logger();
+        }
+
+        add_action('woocommerce_api_' . strtolower(get_class($this)), array($this, 'api_callback'));
+        //add_action('valid-islandpay-request', array($this, 'successful_request'));
+
+        /* 1.6.6 */
+        add_action('woocommerce_update_options_payment_gateways', array($this, 'process_admin_options'));
+        /* 2.0.0 */
+        add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
+
+        add_action('woocommerce_receipt_islandpay', array($this, 'receipt_page'));
+
+        if (!$this->gateway_available_and_enabled()) {
+            $this->enabled = false; // 'yes' if enabled
+        }
+    }
+
+    /**
+     * Log a message to the WC_Logger, if debug mode is on.
+     *
+     * @param string $message
+     * @return void
+     */
+    private function log($message)
+    {
+        if ($this->debug) {
+            $this->logger->add($this->logger_id, $message);
+        }
+    }
+
+    /**
+     * Initialise Gateway Settings Form Fields
+     *
+     */
+    function init_form_fields()
+    {
+        $label = __('Enable Logging', 'wc-gw-islandpay');
+        $description = __('Enable the logging of errors.', 'wc-gw-islandpay');
+
+        if (defined('WC_LOG_DIR')) {
+            $log_url = add_query_arg('tab', 'logs', add_query_arg('page', 'wc-status', admin_url('admin.php')));
+            $log_key = 'wc-gw-islandpay-' . sanitize_file_name(wp_hash('wc-gw-islandpay'));
+            $log_url = add_query_arg('log_file', $log_key, $log_url);
+
+            $label .= ' | ' . sprintf(__('%1$sView Log%2$s', 'wc-gw-islandpay'), '<a href="' . esc_url($log_url) . '">', '</a>');
+        }
+
+        $this->form_fields = array(
+            'enabled'                 => array(
+                'title'   => __('Enable/Disable', 'wc-gw-islandpay'),
+                'label'   => __('Enable Island Pay', 'wc-gw-islandpay'),
+                'type'    => 'checkbox',
+                'default' => 'yes'
+            ),
+            'title'                   => array(
+                'title'       => __('Title', 'wc-gw-islandpay'),
+                'type'        => 'text',
+                'description' => __('This is the title which the user sees during checkout.', 'wc-gw-islandpay'),
+                'default'     => __('Island Pay', 'wc-gw-islandpay')
+            ),
+            'description'             => array(
+                'title'       => __('Description', 'wc-gw-islandpay'),
+                'type'        => 'text',
+                'description' => __('Optional: This is the description which the user sees during checkout.', 'wc-gw-islandpay'),
+                'default'     => __('Pay using your mobile phone with Island Pay.', 'wc-gw-islandpay')
+            ),
+            'merchant_account_id'                => array(
+                'title'       => __('Merchant Account ID', 'wc-gw-islandpay'),
+                'type'        => 'text',
+                'description' => __('Enter your Merchant Account ID here.', 'wc-gw-islandpay'),
+                'default'     => ''
+            ),
+            'device_id'                => array(
+                'title'       => __('Device ID', 'wc-gw-islandpay'),
+                'type'        => 'text',
+                'description' => __('Enter your Device ID here.', 'wc-gw-islandpay'),
+                'default'     => ''
+            ),
+            'pin'                => array(
+                'title'       => __('PIN', 'wc-gw-islandpay'),
+                'type'        => 'text',
+                'description' => __('Enter your PIN here.', 'wc-gw-islandpay'),
+                'default'     => ''
+            ),
+            'testmode' => array(
+                'title'       => __('Test Mode', 'wc-gw-islandpay'),
+                'label'       => __('Use Sandbox', 'wc-gw-islandpay'),
+                'type'        => 'checkbox',
+                'default'     => 'no',
+                'description' => 'Test mode enables you to test payments using the sandbox environment before going live.',
+            ),
+            'debug' => array(
+                'title'       => __('Debug Log', 'wc-gw-islandpay'),
+                'label'       => $label,
+                'description' => $description,
+                'type'        => 'checkbox',
+                'default'     => 'no'
+            )
+        );
+    }
+
+    /**
+     * Get the API endpoint
+     */
+    function api_endpoint()
+    {
+        if ($this->settings['testmode'])
+            return $this->api_endpoint_sandbox;
+        else
+            return $this->api_endpoint;
+    }
+
+    /**
+     * Get the plugin URL
+     */
+    function plugin_url()
+    {
+        if (isset($this->plugin_url)) {
+            return $this->plugin_url;
+        }
+
+        if (is_ssl()) {
+            return $this->plugin_url = str_replace('http://', 'https://', WP_PLUGIN_URL) . "/" . plugin_basename(dirname(dirname(__FILE__)));
+        } else {
+            return $this->plugin_url = WP_PLUGIN_URL . "/" . plugin_basename(dirname(dirname(__FILE__)));
+        }
+    }
+
+    /**
+     * gateway_available_and_enabled()
+     *
+     * Check if this gateway is enabled and available in the base currency being traded with.
+     */
+    function gateway_available_and_enabled()
+    {
+        $is_available  = false;
+        $user_currency = get_option('woocommerce_currency');
+
+        $is_available_currency = in_array($user_currency, $this->available_currencies);
+
+        if (
+            $is_available_currency && $this->enabled == 'yes' && $this->settings['merchant_account_id'] != '' &&
+            $this->settings['device_id'] != '' && $this->settings['pin'] != ''
+        ) {
+            $is_available = true;
+        }
+
+        return $is_available;
+    }
+
+    /**
+     * Admin Panel Options
+     */
+    public function admin_options()
+    {
+        print '<h3>' . __('Island Pay', 'wc-gw-islandpay') . '</h3>';
+        print "<p>";
+        printf(__('IslandPay WooCommerce Payment Gateway provides your customers a way to pay using the IslandPay mobile app using QR Codes.', 'wc-gw-islandpay'), '<a href="https://www.islandpay.com/">', '</a>');
+        print '<br>';
+        print __('Please reach out to IslandPay to request your account details <a href="http://islandpay.com/contact/" target="_blank">here</a>.', 'wc-gw-islandpay');
+        print "</p>";
+
+        if ('BSD' == get_option('woocommerce_currency')) {
+            print '<table class="form-table">';
+            print $this->generate_settings_html();
+            print '</table>';
+        } else {
+            // Determine the settings URL where currency is adjusted.
+            $url = admin_url('admin.php?page=wc-settings&tab=general');
+            // Older settings screen.s
+            if (isset($_GET['page']) && 'woocommerce' == $_GET['page']) {
+                $url = admin_url('admin.php?page=woocommerce&tab=catalog');
+            }
+            print '<div class="inline error"><p><strong>' . _e('Gateway Disabled', 'wc-gw-islandpay') . '</strong>';
+            print sprintf(__('Choose Bahamian Dollars as your store currency in %1$sGeneral Settings%2$s to enable the Island Pay Gateway.', 'wc-gw-islandpay'), '<a href="' . esc_url($url) . '">', '</a>');
+            print '</p></div>';
+        }
+    }
+
+    /**
+     * Show the description if set.
+     */
+    function payment_fields()
+    {
+        if (isset($this->settings['description']) && ('' != $this->settings['description'])) {
+            print wpautop(wptexturize($this->settings['description']));
+        }
+    }
+
+    /**
+     * Process the payment and return the result.
+     *
+     * @param int $order_id
+     *
+     * @return array
+     */
+    function process_payment($order_id)
+    {
+
+        $order = new WC_Order($order_id);
+
+        return array(
+            'result'   => 'success',
+            'redirect' => $order->get_checkout_payment_url(true)
+        );
+    }
+
+    /**
+     * Receipt page.
+     *
+     * Display text and a button to direct the user to Island Pay.
+     *
+     * @param $order_id
+     */
+    function receipt_page($order_id)
+    {
+        $order               = new WC_Order($order_id);
+        $amount              = $order->get_total();
+
+        $order_code = get_post_meta($order_id, 'islandpay_transaction', true);
+        if (empty($order_code)) {
+            $order_code          = $this->create_order($amount);
+            if ($order_code == '') {
+                echo '<p>Error! Please contact support.</p>';
+                return;
+            }
+            update_post_meta($order_id, 'islandpay_transaction', $order_code);
+        }
+
+        $qr_image_base64     = $this->generate_qr_code($order_code);
+        if ($qr_image_base64 == '') {
+            echo '<p>Error! Please contact support.</p>';
+            return;
+        }
+
+        print '
+		<div class="islandpay-wrapper">
+			<style type="text/css">
+				#islandpay-widget {
+				  width: 160px;
+				  padding: 30px 20px;
+				  background-color: #F2F2F2;
+				  box-sizing: content-box;
+				}
+				#islandpay-widget div, #islandpay-widget img, #islandpay-widget a {
+				  line-height: 1em;
+				}
+				#islandpay-widget .islandpay-logo {
+				  background: #F2F2F2 url("' . $this->plugin_url() . "/assets/images/logo_320.png" . '") no-repeat center center;
+				  background-size: 160px auto;
+				  width: 160px;
+				  height: 33px;
+				  margin: 0;
+				  padding: 10px 0;
+				  box-sizing: content-box;
+				}
+				#islandpay-widget .order-code {
+				  background-color: #ffffff;
+				  padding: 0;
+				  box-sizing: content-box;
+				}
+				#islandpay-widget .scan-text {
+				  background: #F2F2F2 url("' . $this->plugin_url() . "/assets/images/scan_text_320.png" . '") no-repeat center center;
+				  background-size: 160px auto;
+				  width: 160px;
+				  height: 35px;
+				  box-sizing: content-box;
+				}
+
+				#islandpay-widget a {
+				  text-decoration:none;
+				  border:none;
+				  display: block;
+				  box-sizing: content-box;
+				  margin: 0;
+				  padding: 0;
+				}
+
+				#islandpay-widget a.info-link {
+				  margin-top: 10px;
+				  box-sizing: content-box;
+				}
+
+				#islandpay-widget img {
+				  border:none;
+				  margin: 0;
+				  padding: 0;
+				  background:transparent;
+				  box-sizing: content-box;
+				  box-shadow: none;
+				  display:block;
+				}
+				@media screen and (max-device-width: 667px){
+				  #islandpay-widget .order-code  {
+					display: none;
+				  }
+				  #islandpay-widget .scan-text {
+					display: none;
+				  }
+				}
+			</style>
+			<div id="islandpay-widget" style="margin:0 auto;text-align: center; border:none">
+				<div class="islandpay-logo"></div>
+				<div class="islandpay-code">
+				  <img class="islandpay" src="' . $qr_image_base64 . '" width="160" height="160" style="padding:0px; background-color:white; border:none; background:transparent">
+				</div>
+				<div class="scan-text"></div>
+			</div>
+		</div>';
+
+        $check_order_url = $this->response_url; // http://yoursite.com/?wc-api=CALLBACK
+
+        // both http://yoursite.com/?wc-api=CALLBACK or http://yoursite.com/wc-api/CALLBACK/ is valid
+        if (strrpos($check_order_url, '?') === false) {
+            $check_order_url .= '?check_status=1&oid=' . $order_id;
+        } else {
+            $check_order_url .= '&check_status=1&oid=' . $order_id;
+        }
+
+        $order_received_url         = $order->get_checkout_order_received_url();
+        $order_checkout_payment_url = $order->get_checkout_payment_url(true);
+
+        $polling_script = '';
+        if (in_array($order->get_status(), array('pending', 'failed'))) {
+            $polling_script = '
+			<script type="text/javascript">
+				var islandpayPollCount = 0;
+				function pollIslandpayPayment() {
+					islandpayPollCount++;
+					jQuery.getJSON("' . $check_order_url . '&count=" + islandpayPollCount).then(
+					function(r) { // success
+					    if (r.status == "processing" || r.status == "completed") {
+					        window.location.replace("' . $order_received_url . '");
+					    } else if (r.continue_polling) {
+					            setTimeout(pollIslandpayPayment, 1000);
+					    } else {
+					        window.location.replace("' . $order_checkout_payment_url . '");
+					    }
+					},
+					function(r) { // fail
+					    // invalid response, try again after a few seconds
+					    setTimeout(pollIslandpayPayment, 3000);
+					});
+				}
+				pollIslandpayPayment();
+			</script>';
+        }
+        print $polling_script;
+    }
+
+    /**
+     * Generate the QR code image using the order code
+     **/
+    public function generate_qr_code($order_code)
+    {
+        $api_url = $this->api_endpoint() . '/qrcodeimage/' . $order_code;
+
+        $args = array(
+            'timeout' => 60,
+            'method'  => 'GET'
+        );
+
+        $res = wp_remote_request($api_url, $args);
+
+        if (!is_wp_error($res) && wp_remote_retrieve_response_code($res) == 200) {
+            $img = wp_remote_retrieve_body($res);
+            return $img;
+        } else {
+            if (is_wp_error($res)) {
+                $this->log($res->get_error_code() . ' - ' . $res->get_error_message());
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Create an order on Island Pay
+     *
+     */
+    public function create_order($amount)
+    {
+        $api_url = $this->api_endpoint() . '/orders';
+
+        $headers = array(
+            'Content-Type'    => 'application/json',
+        );
+
+        $merchant_account_id = $this->settings['merchant_account_id'];
+        $device_id           = $this->settings['device_id'];
+        $pin                 = $this->settings['pin'];
+
+        $body = array(
+            'merchant_account_id' => $merchant_account_id,
+            'device_id'           => $device_id,
+            'pin'                 => $pin,
+            'amount'              => $amount,
+        );
+
+        $args = array(
+            'headers' => $headers,
+            'body'    => json_encode($body),
+            'timeout' => 60,
+            'method'  => 'POST'
+        );
+
+        $res = wp_remote_post($api_url, $args);
+
+        if (!is_wp_error($res) && wp_remote_retrieve_response_code($res) == 200) {
+            $order = json_decode(wp_remote_retrieve_body($res));
+            return $order->code;
+        } else {
+            if (is_wp_error($res)) {
+                $this->log($res->get_error_code() . ' - ' . $res->get_error_message());
+            }
+        }
+        return '';
+    }
+
+    function poll_islandpay_payment($order_id)
+    {
+        $order = wc_get_order($order_id);
+        $order_code = get_post_meta($order_id, 'islandpay_transaction', true);
+        if (empty($order_code)) {
+            status_header(400);
+            exit('Missing or incorrect order_id');
+        }
+
+        $api_url = $this->api_endpoint() . '/orders/' . $order_code;
+
+        $args = array(
+            'timeout' => 60,
+            'method'  => 'GET'
+        );
+
+        $res = wp_remote_request($api_url, $args);
+
+        if (!is_wp_error($res) && wp_remote_retrieve_response_code($res) == 200) {
+            $islandpay_order = json_decode(wp_remote_retrieve_body($res));
+            $this->successful_request($order, $islandpay_order);
+        } else {
+            if (is_wp_error($res)) {
+                $this->log($res->get_error_code() . ' - ' . $res->get_error_message());
+            }
+        }
+    }
+
+    function exit_with_json_result($order_status, $continue_polling)
+    {
+        print wp_json_encode(
+            array(
+                'status'           => $order_status,
+                'continue_polling' => $continue_polling
+            )
+        );
+        exit;
+    }
+
+    /**
+     * API Callback
+     */
+    function api_callback()
+    {
+        if (isset($_GET['check_status']) && $_GET['check_status']) {
+            // FROM JS
+            $order_id = (int) $_GET['oid'];
+            $order    = wc_get_order($order_id);
+            // if the order is not pending or failed then we can stop polling
+            if (!in_array($order->get_status(), array('pending', 'failed'))) {
+                $this->exit_with_json_result($order->get_status(), false);
+            } else {
+                // poll Island Pay servers directly every 5 seconds
+                $last_poll_time = get_post_meta($order_id, 'islandpay_poll_request', true);
+                if ($last_poll_time === '' || (time() - $last_poll_time >= 1)) {
+                    update_post_meta($order_id, 'islandpay_poll_request', time());
+                    $this->poll_islandpay_payment($order_id);
+                }
+            }
+            $this->exit_with_json_result($order->get_status(), true);
+        } else {
+            // FROM ISLAND PAY FOR NOTIFICATIONS
+            $_POST = stripslashes_deep($_POST);
+            $this->validate_callback_request();
+            //do_action('valid-islandpay-request', json_decode($_POST['payload'], true));
+            //$islandpay_order = json_decode($_POST['payload'], true);
+            //$order = ??;
+            //$this->successful_request($order, $islandpay_order);
+        }
+    }
+
+
+    /**
+     * Validate callback request
+     *
+     */
+    function validate_callback_request()
+    {
+        if (!isset($_POST['payload'])) {
+            status_header(400);
+            exit('payload missing');
+        }
+
+        // if (!(isset($_GET['token']) && $_GET['token'] === $this->settings['merchant_callback_token'])) {
+        //     status_header(400);
+        //     exit('Missing or incorrect token');
+        // }
+    }
+
+    /**
+     * Successful Payment
+     *
+     * @param $payload
+     */
+    function successful_request($order, $islandpay_order)
+    {
+        // Island Pay services uses word 'finalished' for a finalized order
+        if (('finalished' === $islandpay_order->status) && (!in_array($order->get_status(), array(
+                'completed',
+                'processing'
+            )))
+        ) {
+            $order->add_order_note(__("Island Pay payment completed\nOrder Code: {$islandpay_order->code}", 'wc-gw-islandpay'));
+            $order->payment_complete();
+            delete_post_meta($order->get_order_number(), 'islandpay_poll_request');
+        }
+    }
+}

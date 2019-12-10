@@ -3,9 +3,9 @@
 # Installation
 
 1. Download ZIP file of this plugin at
-  * https://github.com/islandpay/wc-gw-islandpay
-    1. Click `Clone or download`
-    1. Click `Download ZIP`
+    * https://github.com/islandpay/wc-gw-islandpay
+      1. Click `Clone or download`
+      1. Click `Download ZIP`
 1. Open your WooCommerce admin page
 1. Go to `Plugins` > `Add New`
 1. Click `Upload Plugin`

@@ -36,7 +36,7 @@ class WC_Gateway_IslandPay extends WC_Payment_Gateway
 
         // Setup default merchant data.
         $this->url                  = 'https://www.islandpay.com';
-        $this->api_endpoint         = 'https://snapper.islandpay.com/ecomm';
+        $this->api_endpoint_pro     = 'https://snapper.islandpay.com/ecomm';
         $this->api_endpoint_sandbox = 'https://conch.islandpay.com/ecomm';
         $this->response_url         = add_query_arg('wc-api', 'WC_Gateway_IslandPay', home_url('/'));
 
@@ -159,7 +159,7 @@ class WC_Gateway_IslandPay extends WC_Payment_Gateway
         if ($this->settings['testmode'])
             return $this->api_endpoint_sandbox;
         else
-            return $this->api_endpoint;
+            return $this->api_endpoint_pro;
     }
 
     /**

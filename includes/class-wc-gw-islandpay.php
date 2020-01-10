@@ -156,10 +156,10 @@ class WC_Gateway_IslandPay extends WC_Payment_Gateway
      */
     function api_endpoint()
     {
-        if ($this->settings['testmode'])
-            return $this->api_endpoint_sandbox;
-        else
+        if ($this->settings['testmode'] == 'no')
             return $this->api_endpoint_pro;
+        else
+            return $this->api_endpoint_sandbox;
     }
 
     /**

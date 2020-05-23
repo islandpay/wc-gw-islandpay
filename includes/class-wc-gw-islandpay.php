@@ -289,20 +289,19 @@ class WC_Gateway_IslandPay extends WC_Payment_Gateway
 		<div class="islandpay-wrapper">
 			<style type="text/css">
 				#islandpay-widget {
-				  width: 160px;
+				  width: 90%;
+				  max-width: 400px;
 				  padding: 30px 20px;
-				  background-color: #F2F2F2;
+				  background-color: #13395e;
 				  box-sizing: content-box;
 				}
 				#islandpay-widget div, #islandpay-widget img, #islandpay-widget a {
 				  line-height: 1em;
 				}
 				#islandpay-widget .islandpay-logo {
-				  background: #F2F2F2 url("' . $this->plugin_url() . "/assets/images/logo_320.png" . '") no-repeat center center;
-				  background-size: 160px auto;
-				  width: 160px;
-				  height: 33px;
-				  margin: 0;
+				  width: 80%;
+				  margin-left: auto;
+				  margin-right: auto;
 				  padding: 10px 0;
 				  box-sizing: content-box;
 				}
@@ -312,10 +311,6 @@ class WC_Gateway_IslandPay extends WC_Payment_Gateway
 				  box-sizing: content-box;
 				}
 				#islandpay-widget .scan-text {
-				  background: #F2F2F2 url("' . $this->plugin_url() . "/assets/images/scan_text_320.png" . '") no-repeat center center;
-				  background-size: 160px auto;
-				  width: 160px;
-				  height: 35px;
 				  box-sizing: content-box;
 				}
 
@@ -334,13 +329,17 @@ class WC_Gateway_IslandPay extends WC_Payment_Gateway
 				}
 
 				#islandpay-widget img {
-				  border:none;
-				  margin: 0;
+                  border:none;
+                  width: 90%;
+				  margin-top: 0;
+				  margin-bottom: 0;
+				  margin-left: auto;
+				  margin-right: auto;
 				  padding: 0;
 				  background:transparent;
 				  box-sizing: content-box;
 				  box-shadow: none;
-				  display:block;
+                  display:block;
 				}
 				@media screen and (max-device-width: 667px){
 				  #islandpay-widget .order-code  {
@@ -352,9 +351,11 @@ class WC_Gateway_IslandPay extends WC_Payment_Gateway
 				}
 			</style>
 			<div id="islandpay-widget" style="margin:0 auto;text-align: center; border:none">
-				<div class="islandpay-logo"></div>
+                <div class="islandpay-logo">
+                    <img src="' . $this->plugin_url() . "/assets/images/logo_text.png" . '" />
+                </div>
 				<div class="islandpay-code">
-				  <img class="islandpay" src="' . $qr_image_base64 . '" width="160" height="160" style="padding:0px; background-color:white; border:none; background:transparent">
+				  <img class="islandpay" src="' . $qr_image_base64 . '" />
 				</div>
 				<div class="scan-text"></div>
 			</div>

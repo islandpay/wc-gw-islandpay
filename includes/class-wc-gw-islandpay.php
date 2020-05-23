@@ -309,8 +309,41 @@ class WC_Gateway_IslandPay extends WC_Payment_Gateway
                     box-sizing: content-box;
 				}
                 
+				#islandpay-widget > div.pay-button {
+                    display: inline-block;
+                    width: 50%;
+                    margin-left: auto;
+                    margin-right: auto;
+                    border: 1px solid white;
+                    border-radius: 10px;
+                    padding: 10px;
+                    cursor: pointer;
+                }
+
+				#islandpay-widget > div.pay-button > span {
+                    color: white !important;
+                    display: inline-block;
+                    margin-bottom: 0.5em;
+                }
+
+				#islandpay-widget > div.pay-button > img {
+                    display: inline-block;
+                    width: auto;
+                }
+
+				#islandpay-widget > div.scan-text {
+                    box-sizing: content-box;
+                    margin-top: 1em;
+                    margin-bottom: 1em;
+                }
+                  
+				#islandpay-widget > div.scan-text > span {
+                    color: white !important;
+                }
+
 				#islandpay-widget > div.islandpay-logo {
                     width: 90%;
+                    margin-top: 1em;
                     margin-left: auto;
                     margin-right: auto;
                     padding: 10px 0;
@@ -330,55 +363,19 @@ class WC_Gateway_IslandPay extends WC_Payment_Gateway
                     box-shadow: none;
                     display:block;
                 }
-				#islandpay-widget > div.islandpay-code {
-                    margin-top: 1em;
-                }
-
-				#islandpay-widget > div.scan-text {
-                    box-sizing: content-box;
-                    margin-top: 1em;
-                    margin-bottom: 1em;
-                }
-                  
-				#islandpay-widget > div.scan-text > span {
-                    color: white !important;
-                }
-                
-				#islandpay-widget > div.pay-button {
-                    display: inline-block;
-                    width: 50%;
-                    margin-left: auto;
-                    margin-right: auto;
-                    border: 1px solid white;
-                    border-radius: 10px;
-                    padding: 10px;
-                    cursor: pointer;
-                }
-				#islandpay-widget > div.pay-button > span {
-                    color: white !important;
-                    display: inline-block;
-                    margin-bottom: 0.5em;
-                }
-				#islandpay-widget > div.pay-button > img {
-                    display: inline-block;
-                    width: auto;
-                }
 			</style>
             <div id="islandpay-widget" style="margin:0 auto;text-align: center; border:none">
-                <script>
-
-                </script>
-                <div class="islandpay-logo">
+                <div class="pay-button" onclick="window.location = \'' . $this->order_page_url($order_code) . '\'">
+                    <span>Pay with</span>
                     <img src="' . $this->plugin_url() . "/assets/images/logo_text.png" . '" />
+                </div>
+                <div class="scan-text">
+                    <span>or scan QR Code</span>
                 </div>
 				<div class="islandpay-code">
 				  <img class="islandpay" src="' . $qr_image_base64 . '" />
 				</div>
-                <div class="scan-text">
-                    <span>Scan QR code or</span>
-                </div>
-                <div class="pay-button" onclick="window.location = \'' . $this->order_page_url($order_code) . '\'">
-                    <span>Pay with</span>
+                <div class="islandpay-logo">
                     <img src="' . $this->plugin_url() . "/assets/images/logo_text.png" . '" />
                 </div>
 			</div>

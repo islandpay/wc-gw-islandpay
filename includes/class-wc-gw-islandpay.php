@@ -38,8 +38,10 @@ class WC_Gateway_IslandPay extends WC_Payment_Gateway
         $this->url                    = 'https://www.islandpay.com';
         $this->api_endpoint_pro       = 'https://snapper.islandpay.com/api/merchant/ecomm';
         $this->api_endpoint_sandbox   = 'https://conch.islandpay.com/api/merchant/ecomm';
-        $this->order_page_url_pro     = 'https://snapper.islandpay.com/consumer/pay?order=';
-        $this->order_page_url_sandbox = 'https://conch.islandpay.com/consumer/pay?order=';
+        //$this->order_page_url_pro     = 'https://snapper.islandpay.com/consumer/pay?order=';
+        //$this->order_page_url_sandbox = 'https://conch.islandpay.com/consumer/pay?order=';
+        $this->order_page_url_pro     = 'islandpay://snapper.islandpay.com/consumer/pay?order=';
+        $this->order_page_url_sandbox = 'islandpay://conch.islandpay.com/consumer/pay?order=';
         $this->response_url           = add_query_arg('wc-api', 'WC_Gateway_IslandPay', home_url('/'));
 
         // Debug mode.
